@@ -208,11 +208,14 @@
         <!-- 仪表板区域 -->
         <section id="dashboardSection" class="hidden">
             <!-- 重要声明 -->
-            <div class="bg-warning/10 border-l-4 border-warning p-4 mb-6 rounded-r flex items-start animate-fade-in">
+            <div class="bg-warning/10 border-l-4 border-warning p-4 mb-6 rounded-r flex items-start animate-fade-in" id="importantNote">
                 <i class="fa fa-exclamation-triangle text-warning mt-1 mr-3"></i>
                 <p class="text-sm text-gray-700">
                     <strong>重要说明：</strong>员工数据看板基于您选择的花名册本地生成，不会上传任何服务器。
                 </p>
+                <button id="hideNoteBtn" class="ml-auto text-warning hover:text-warning/80 transition-colors">
+                    <i class="fa fa-times"></i>
+                </button>
             </div>
 
             <!-- 关键指标卡片 -->
@@ -523,9 +526,16 @@
         const refreshBtn = document.getElementById('refreshBtn');
         const exportBtn = document.getElementById('exportBtn');
         const resetPageBtn = document.getElementById('resetPageBtn'); // 新增：刷新页面按钮
+        const importantNote = document.getElementById('importantNote');
+        const hideNoteBtn = document.getElementById('hideNoteBtn');
         
         // 初始化事件监听
         function initEventListeners() {
+            // 重要说明隐藏按钮事件
+            hideNoteBtn.addEventListener('click', function() {
+                importantNote.classList.add('hidden');
+            });
+            
             // 文件拖放事件
             ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
                 dropArea.addEventListener(eventName, preventDefaults, false);
