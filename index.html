@@ -1,7 +1,7 @@
 <html lang="zh-CN"><head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>花名册生成员工信息仪表板</title>
+    <title>花名册生成员工数据看板</title>
     <!-- 引入外部资源 -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
@@ -126,17 +126,17 @@
         <div class="container mx-auto px-4 py-3 flex justify-between items-center">
             <div class="flex items-center space-x-2">
                 <i class="fa fa-users text-primary text-2xl"></i>
-                <h1 class="text-xl font-bold text-dark">人员信息看板</h1>
+                <h1 class="text-xl font-bold text-dark">员工数据看板</h1>
             </div>
             <div class="flex items-center space-x-4">
                 <!-- 新增：刷新网页按钮 -->
                 <button id="resetPageBtn" class="text-gray-500 hover:text-primary transition-colors flex items-center hidden">
                     <i class="fa fa-refresh mr-1"></i>
-                    <span>重新上传</span>
+                    <span>返回</span>
                 </button>
                 <button id="refreshBtn" class="text-gray-500 hover:text-primary transition-colors hidden flex items-center">
-                    <i class="fa fa-refresh mr-1"></i>
-                    <span>重新生成</span>
+                        <!-- <i class="fa fa-refresh mr-1"></i>
+                        <span>重新生成</span> -->
                 </button>
                 <button id="exportBtn" class="text-gray-500 hover:text-primary transition-colors hidden flex items-center">
                     <i class="fa fa-download mr-1"></i>
@@ -151,8 +151,9 @@
         <!-- 上传区域 -->
         <section id="uploadSection" class="py-12">
             <div class="max-w-3xl mx-auto text-center mb-8">
-                <h2 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-dark mb-3">上传花名册生成数据看板</h2>
-                <p class="text-info">支持Excel、CSV格式文件，所有数据不会上传，本地生成图表</p>
+                <h2 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-dark mb-3">打开花名册生成员工数据看板</h2>
+                <p class="text-info">支持Excel、CSV格式文件，数据不会上传，本地生成图表</p>
+                 <p class="text-info">没有花名册文件？可以下载<a href="https://gh-proxy.com/https://github.com/Harteyang/hrtools/raw/refs/heads/main/%E8%8A%B1%E5%90%8D%E5%86%8C%E6%A8%A1%E7%89%88.xlsx" class="text-primary hover:underline">模板文件</a>填写示例数据</p>
             </div>
             
             <!-- 拖放上传区域 -->
@@ -162,7 +163,7 @@
                         <i class="fa fa-cloud-upload text-primary text-2xl"></i>
                     </div>
                     <h3 class="text-lg font-medium mb-2">拖放花名册文件到此处</h3>
-                    <p class="text-info text-sm mb-6">或点击选择文件上传</p>
+                    <p class="text-info text-sm mb-6">或点击选择文件</p>
                     
                     <label class="inline-block bg-primary text-white px-6 py-3 rounded-lg font-medium cursor-pointer hover:bg-primary/90 transition-colors pulse-animation">
                         <i class="fa fa-file-excel-o mr-2"></i>选择花名册文件
@@ -177,7 +178,7 @@
             
             <!-- 上传示例和表头说明已移除 -->
             <div class="max-w-3xl mx-auto mt-8 text-center">
-                <p class="text-sm text-info mb-3">没有花名册文件？可以下载<a href="https://gh-proxy.com/https://github.com/Harteyang/hrtools/raw/refs/heads/main/%E8%8A%B1%E5%90%8D%E5%86%8C%E6%A8%A1%E7%89%88.xlsx" class="text-primary hover:underline">模板文件</a>填写示例数据</p>
+                <p class="text-sm text-info mb-3">使用问题请联系作者微信：harteyang</p>
             </div>
         </section>
         
@@ -199,7 +200,7 @@
                 <h3 class="text-lg font-medium text-danger mb-2" id="errorTitle">数据格式不正确，请下载模板文件</h3>
                 <p class="text-info text-sm mb-6" id="errorMessage">请使用标准模板填写数据，<a href="https://gh-proxy.com/https://github.com/Harteyang/hrtools/raw/refs/heads/main/%E8%8A%B1%E5%90%8D%E5%86%8C%E6%A8%A1%E7%89%88.xlsx" class="text-primary hover:underline">点击下载模板文件</a>，然后重试</p>
                 <button id="retryBtn" class="bg-white border border-primary text-primary px-5 py-2 rounded-lg font-medium hover:bg-primary/5 transition-colors">
-                    重新上传
+                    重新打开
                 </button>
             </div>
         </section>
@@ -210,7 +211,7 @@
             <div class="bg-warning/10 border-l-4 border-warning p-4 mb-6 rounded-r flex items-start animate-fade-in">
                 <i class="fa fa-exclamation-triangle text-warning mt-1 mr-3"></i>
                 <p class="text-sm text-gray-700">
-                    <strong>重要说明：</strong>这里是基于您提供的花名册本地生成的员工信息管理表，数据不会上传服务器，数据信息安全防护，严禁数据外泄，请相关负责人做好操作安全风险。
+                    <strong>重要说明：</strong>员工数据看板基于您选择的花名册本地生成，不会上传任何服务器。
                 </p>
             </div>
 
@@ -572,7 +573,7 @@
             // 新增：刷新页面按钮事件 - 回到上传表格页面
             resetPageBtn.addEventListener('click', () => {
                 // 显示确认对话框
-                if (confirm('确定要刷新页面并返回上传表格页面吗？当前数据将被清除。')) {
+                if (confirm('确定要刷新页面并返回吗？当前数据将被清除。')) {
                     // 重置应用状态
                     employeeData = [];
                     // 清除现有图表
@@ -764,7 +765,7 @@
                         readFile(file);
                     }, 500);
                 } else {
-                    showErrorSection('文件格式错误', '请上传.xlsx, .xls或.csv格式的文件');
+                    showErrorSection('文件格式错误', '请选择.xlsx, .xls或.csv格式的文件');
                 }
             }
         }
@@ -795,7 +796,7 @@
                     const jsonData = XLSX.utils.sheet_to_json(worksheet);
                     
                     if (jsonData.length === 0) {
-                        showErrorSection('文件内容为空', '上传的文件不包含任何数据，请检查文件');
+                        showErrorSection('文件内容为空', '选择的文件不包含任何数据，请检查文件');
                         return;
                     }
                     
