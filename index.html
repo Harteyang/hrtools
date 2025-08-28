@@ -1,4 +1,5 @@
-<html lang="zh-CN"><head>
+<html lang="zh-CN">
+<head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>花名册生成员工数据看板</title>
@@ -117,6 +118,32 @@
             .editing-breathing-bg {
                 animation: breathing 2s ease-in-out infinite;
             }
+            /* 字段映射样式 */
+            .mapping-container {
+                max-height: 400px;
+                overflow-y: auto;
+            }
+            .mapping-item {
+                transition: all 0.2s ease;
+            }
+            .mapping-item:hover {
+                background-color: rgba(22, 93, 255, 0.03);
+            }
+            .field-match {
+                background-color: rgba(0, 180, 42, 0.1);
+                border-left: 3px solid #00B42A;
+            }
+            .field-warning {
+                background-color: rgba(255, 125, 0, 0.1);
+                border-left: 3px solid #FF7D00;
+            }
+            .date-example {
+                font-family: monospace;
+                background-color: rgba(0, 0, 0, 0.05);
+                padding: 0 3px;
+                border-radius: 2px;
+                font-size: 12px;
+            }
         }
     </style>
 </head>
@@ -135,8 +162,8 @@
                     <span>返回</span>
                 </button>
                 <button id="refreshBtn" class="text-gray-500 hover:text-primary transition-colors hidden flex items-center">
-                        <!-- <i class="fa fa-refresh mr-1"></i>
-                        <span>重新生成</span> -->
+                        <i class="fa fa-refresh mr-1"></i>
+                        <span>重新生成</span>
                 </button>
                 <button id="exportBtn" class="text-gray-500 hover:text-primary transition-colors hidden flex items-center">
                     <i class="fa fa-download mr-1"></i>
@@ -172,6 +199,7 @@
                     
                     <p class="text-xs text-info mt-6">
                         <i class="fa fa-info-circle mr-1"></i> 支持格式: .xlsx, .xls, .csv | 最大文件大小: 10MB
+                        <br><i class="fa fa-info-circle mr-1"></i> 支持多种表头名称和日期格式（如：<span class="date-example">2023/12/31</span>、<span class="date-example">31-12-2023</span>、<span class="date-example">2023年12月31日</span>）
                     </p>
                 </div>
             </div>
@@ -179,6 +207,29 @@
             <!-- 上传示例和表头说明已移除 -->
             <div class="max-w-3xl mx-auto mt-8 text-center">
                 <p class="text-sm text-info mb-3">使用问题请联系作者微信：harteyang</p>
+            </div>
+        </section>
+        
+        <!-- 字段映射区域 -->
+        <section id="mappingSection" class="py-12 hidden">
+            <div class="max-w-3xl mx-auto">
+                <h2 class="text-2xl font-bold text-dark mb-6 text-center">字段映射</h2>
+                <p class="text-info text-center mb-8">系统已自动匹配字段，如有需要请调整</p>
+                
+                <div class="bg-white rounded-xl p-6 card-shadow mapping-container">
+                    <div id="mappingItems">
+                        <!-- 动态生成字段映射项 -->
+                    </div>
+                </div>
+                
+                <div class="mt-8 flex justify-center space-x-4">
+                    <button id="cancelMappingBtn" class="bg-white border border-gray-300 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors">
+                        取消
+                    </button>
+                    <button id="confirmMappingBtn" class="bg-primary text-white px-6 py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors">
+                        确认并生成看板
+                    </button>
+                </div>
             </div>
         </section>
         
@@ -197,8 +248,16 @@
                 <div class="w-12 h-12 bg-danger/10 rounded-full flex items-center justify-center mx-auto mb-4">
                     <i class="fa fa-exclamation-triangle text-danger text-xl"></i>
                 </div>
-                <h3 class="text-lg font-medium text-danger mb-2" id="errorTitle">数据格式不正确，请下载模板文件</h3>
-                <p class="text-info text-sm mb-6" id="errorMessage">请使用标准模板填写数据，<a href="https://gh-proxy.com/https://github.com/Harteyang/hrtools/raw/refs/heads/main/%E8%8A%B1%E5%90%8D%E5%86%8C%E6%A8%A1%E7%89%88.xlsx" class="text-primary hover:underline">点击下载模板文件</a>，然后重试</p>
+                <h3 class="text-lg font-medium text-danger mb-2" id="errorTitle">数据格式不正确</h3>
+                <p class="text-info text-sm mb-4" id="errorMessage">请检查您的文件是否包含必要的数据</p>
+                
+                <div id="errorDetails" class="text-left bg-white p-4 rounded-lg text-sm mb-6 hidden">
+                    <h4 class="font-medium text-danger mb-2">问题详情：</h4>
+                    <ul class="list-disc list-inside text-gray-700 space-y-1" id="errorDetailsList">
+                        <!-- 动态填充错误详情 -->
+                    </ul>
+                </div>
+                
                 <button id="retryBtn" class="bg-white border border-primary text-primary px-5 py-2 rounded-lg font-medium hover:bg-primary/5 transition-colors">
                     重新打开
                 </button>
@@ -508,26 +567,34 @@
 
     <!-- JavaScript -->
     <script>
-        // 全局变量存储员工数据
+        // 全局变量存储员工数据和字段映射
         let employeeData = [];
         let charts = {}; // 存储所有ECharts实例
+        let fieldMapping = {}; // 存储字段映射关系
+        let rawHeaders = []; // 存储原始表头
         
         // DOM元素
         const dropArea = document.getElementById('dropArea');
         const fileInput = document.getElementById('fileInput');
         const uploadSection = document.getElementById('uploadSection');
+        const mappingSection = document.getElementById('mappingSection');
         const loadingSection = document.getElementById('loadingSection');
         const errorSection = document.getElementById('errorSection');
         const dashboardSection = document.getElementById('dashboardSection');
         const loadingMessage = document.getElementById('loadingMessage');
         const errorTitle = document.getElementById('errorTitle');
         const errorMessage = document.getElementById('errorMessage');
+        const errorDetails = document.getElementById('errorDetails');
+        const errorDetailsList = document.getElementById('errorDetailsList');
         const retryBtn = document.getElementById('retryBtn');
         const refreshBtn = document.getElementById('refreshBtn');
         const exportBtn = document.getElementById('exportBtn');
-        const resetPageBtn = document.getElementById('resetPageBtn'); // 新增：刷新页面按钮
+        const resetPageBtn = document.getElementById('resetPageBtn');
         const importantNote = document.getElementById('importantNote');
         const hideNoteBtn = document.getElementById('hideNoteBtn');
+        const mappingItems = document.getElementById('mappingItems');
+        const confirmMappingBtn = document.getElementById('confirmMappingBtn');
+        const cancelMappingBtn = document.getElementById('cancelMappingBtn');
         
         // 初始化事件监听
         function initEventListeners() {
@@ -571,6 +638,12 @@
             // 重试按钮
             retryBtn.addEventListener('click', showUploadSection);
             
+            // 取消映射按钮
+            cancelMappingBtn.addEventListener('click', showUploadSection);
+            
+            // 确认映射按钮
+            confirmMappingBtn.addEventListener('click', processMappedData);
+            
             // 刷新按钮（重新生成）
             refreshBtn.addEventListener('click', () => {
                 showLoadingSection('正在重新生成仪表板...');
@@ -580,7 +653,7 @@
                 }, 800);
             });
             
-            // 新增：刷新页面按钮事件 - 回到上传表格页面
+            // 刷新页面按钮事件 - 回到上传表格页面
             resetPageBtn.addEventListener('click', () => {
                 // 显示确认对话框
                 if (confirm('确定要刷新页面并返回吗？当前数据将被清除。')) {
@@ -775,7 +848,7 @@
                         readFile(file);
                     }, 500);
                 } else {
-                    showErrorSection('文件格式错误', '请选择.xlsx, .xls或.csv格式的文件');
+                    showErrorSection('文件格式错误', '请选择.xlsx, .xls或.csv格式的文件，且文件大小不超过10MB');
                 }
             }
         }
@@ -795,12 +868,30 @@
                 try {
                     loadingMessage.textContent = '正在处理数据...';
                     
-                    const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
+                    let workbook;
+                    if (file.name.endsWith('.csv')) {
+                        // 处理CSV文件
+                        const text = e.target.result;
+                        workbook = XLSX.read(text, { type: 'string' });
+                    } else {
+                        // 处理Excel文件
+                        const data = new Uint8Array(e.target.result);
+                        workbook = XLSX.read(data, { type: 'array' });
+                    }
                     
                     // 获取第一个工作表
                     const firstSheetName = workbook.SheetNames[0];
                     const worksheet = workbook.Sheets[firstSheetName];
+                    
+                    // 获取原始表头
+                    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:A1');
+                    rawHeaders = [];
+                    for (let c = range.s.c; c <= range.e.c; c++) {
+                        const cellAddress = XLSX.utils.encode_cell({ r: 0, c: c });
+                        if (worksheet[cellAddress]) {
+                            rawHeaders.push(worksheet[cellAddress].v.toString().trim());
+                        }
+                    }
                     
                     // 转换为JSON
                     const jsonData = XLSX.utils.sheet_to_json(worksheet);
@@ -810,19 +901,12 @@
                         return;
                     }
                     
-                    // 验证数据结构
-                    if (validateDataStructure(jsonData)) {
-                        // 处理数据
-                        employeeData = processEmployeeData(jsonData);
-                        
-                        loadingMessage.textContent = '正在生成仪表板...';
-                        setTimeout(() => {
-                            generateDashboard();
-                            showDashboardSection();
-                        }, 800);
-                    } else {
-                        showErrorSection('数据格式不正确，请下载模板文件', '请使用标准模板填写数据，<a href="#" class="text-primary hover:underline">点击下载模板文件</a>，然后重试');
-                    }
+                    // 尝试自动映射字段
+                    createFieldMapping(rawHeaders);
+                    
+                    // 显示字段映射界面
+                    showMappingSection();
+                    
                 } catch (error) {
                     console.error('文件解析错误:', error);
                     showErrorSection('文件解析失败', '无法解析文件内容，请检查文件是否损坏或格式正确');
@@ -840,77 +924,325 @@
             }
         }
         
-        // 验证数据结构
-        function validateDataStructure(data) {
-            if (!data || data.length === 0) return false;
-            
-            const requiredFields = ['姓名', '部门', '岗位', '入职日期', '转正日期', '员工类型', '工作城市', '直接上级'];
-            const firstRow = data[0];
-            
-            // 检查是否包含所有必要的字段（不区分大小写）
-            const hasAllFields = requiredFields.every(field => {
-                return Object.keys(firstRow).some(key => 
-                    key.toLowerCase().includes(field.toLowerCase())
-                );
-            });
-            
-            return hasAllFields;
-        }
-        
-        // 处理员工数据，标准化字段名
-        function processEmployeeData(rawData) {
-            // 标准化字段名的映射关系
-            const fieldMappings = {
-                '姓名': ['姓名', '员工姓名', 'name'],
-                '部门': ['部门', '所属部门', 'dept', 'department'],
-                '岗位': ['岗位', '职位', 'position', 'job'],
-                '入职日期': ['入职日期', '聘用日期', 'hire date', 'hiredate'],
-                '转正日期': ['转正日期', '正式日期', 'regular date'],
-                '员工类型': ['员工类型', '人员类型', '类型', 'employee type'],
-                '工作城市': ['工作城市', '所在城市', '城市', 'city'],
-                '直接上级': ['直接上级', '上级', '主管', 'manager', 'supervisor'],
-                '离职日期': ['离职日期', '离开日期', 'resign date'] // 新增离职日期字段支持
+        // 创建字段映射
+        function createFieldMapping(headers) {
+            // 扩展可能的表头名称变体，增加匹配灵活性
+            const fieldVariants = {
+                '姓名': ['姓名', '员工姓名', '名称', 'name', 'employee name', '人员姓名'],
+                '部门': ['部门', '所属部门', '部门名称', 'dept', 'department', '部门编号'],
+                '岗位': ['岗位', '职位', '职务', 'position', 'job', '岗位名称', '职位名称'],
+                '入职日期': ['入职日期', '聘用日期', '入职时间', 'hire date', 'hiredate', '加入日期'],
+                '转正日期': ['转正日期', '正式日期', '转正时间', 'regular date', 'confirmation date'],
+                '员工类型': ['员工类型', '人员类型', '类型', 'employee type', '人员性质', '用工类型'],
+                '工作城市': ['工作城市', '所在城市', '城市', 'city', '工作地点城市'],
+                '直接上级': ['直接上级', '上级', '主管', '经理', 'manager', 'supervisor', '直属领导'],
+                '离职日期': ['离职日期', '离开日期', '辞职日期', 'resign date', 'departure date']
             };
             
-            // 标准化每个条目
-            return rawData.map(item => {
-                const normalizedItem = {};
+            // 初始化字段映射
+            fieldMapping = {};
+            Object.keys(fieldVariants).forEach(targetField => {
+                fieldMapping[targetField] = null;
                 
-                // 遍历需要的字段，找到匹配的原始字段
-                Object.keys(fieldMappings).forEach(targetField => {
-                    const possibleNames = fieldMappings[targetField];
+                // 尝试找到最佳匹配
+                headers.forEach(header => {
+                    const headerLower = header.toLowerCase();
+                    // 检查是否有变体匹配
+                    const matchedVariant = fieldVariants[targetField].find(variant => 
+                        headerLower.includes(variant.toLowerCase())
+                    );
                     
-                    // 查找匹配的字段名
-                    for (const rawField of Object.keys(item)) {
-                        if (possibleNames.some(name => 
-                            rawField.toLowerCase().includes(name.toLowerCase())
-                        )) {
-                            normalizedItem[targetField] = item[rawField];
-                            break;
-                        }
+                    if (matchedVariant && !fieldMapping[targetField]) {
+                        fieldMapping[targetField] = header;
+                    }
+                });
+            });
+        }
+        
+        // 显示字段映射区域
+        function showMappingSection() {
+            uploadSection.classList.add('hidden');
+            loadingSection.classList.add('hidden');
+            errorSection.classList.add('hidden');
+            dashboardSection.classList.add('hidden');
+            mappingSection.classList.remove('hidden');
+            
+            // 生成映射项HTML
+            mappingItems.innerHTML = '';
+            
+            Object.keys(fieldMapping).forEach(targetField => {
+                const mappingItem = document.createElement('div');
+                mappingItem.className = `mapping-item p-3 border-b border-gray-100 ${
+                    fieldMapping[targetField] ? 'field-match' : 'field-warning'
+                }`;
+                
+                // 创建下拉菜单选项
+                let selectOptions = '<option value="">-- 请选择 --</option>';
+                rawHeaders.forEach(header => {
+                    selectOptions += `<option value="${header}" ${
+                        fieldMapping[targetField] === header ? 'selected' : ''
+                    }>${header}</option>`;
+                });
+                
+                mappingItem.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">${targetField} ${
+                                !fieldMapping[targetField] ? '<span class="text-danger text-xs">*</span>' : ''
+                            }</label>
+                            <select class="field-select w-full p-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary" data-target="${targetField}">
+                                ${selectOptions}
+                            </select>
+                        </div>
+                    </div>
+                `;
+                
+                mappingItems.appendChild(mappingItem);
+            });
+            
+            // 添加选择事件监听
+            document.querySelectorAll('.field-select').forEach(select => {
+                select.addEventListener('change', function() {
+                    const targetField = this.getAttribute('data-target');
+                    const selectedValue = this.value;
+                    
+                    // 更新字段映射
+                    fieldMapping[targetField] = selectedValue || null;
+                    
+                    // 更新样式
+                    const mappingItem = this.closest('.mapping-item');
+                    if (selectedValue) {
+                        mappingItem.classList.remove('field-warning');
+                        mappingItem.classList.add('field-match');
+                    } else {
+                        mappingItem.classList.remove('field-match');
+                        mappingItem.classList.add('field-warning');
+                    }
+                });
+            });
+        }
+        
+        // 处理映射后的数据
+        function processMappedData() {
+            // 验证必填字段
+            const requiredFields = ['姓名', '部门', '岗位', '入职日期', '员工类型'];
+            const missingFields = requiredFields.filter(field => !fieldMapping[field]);
+            
+            if (missingFields.length > 0) {
+                showErrorSection(
+                    '缺少必要字段', 
+                    `请映射以下必要字段: ${missingFields.join('、')}`
+                );
+                return;
+            }
+            
+            showLoadingSection('正在处理数据...');
+            
+            // 重新读取文件并应用映射
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                try {
+                    let workbook;
+                    if (file.name.endsWith('.csv')) {
+                        const text = e.target.result;
+                        workbook = XLSX.read(text, { type: 'string' });
+                    } else {
+                        const data = new Uint8Array(e.target.result);
+                        workbook = XLSX.read(data, { type: 'array' });
+                    }
+                    
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const rawData = XLSX.utils.sheet_to_json(worksheet);
+                    
+                    // 应用字段映射处理数据
+                    employeeData = processMappedEmployeeData(rawData);
+                    
+                    // 验证处理后的数据
+                    const validationErrors = validateProcessedData(employeeData);
+                    if (validationErrors.length > 0) {
+                        showErrorWithDetails(
+                            '数据验证失败',
+                            '发现以下数据问题，请检查并修正后重试',
+                            validationErrors
+                        );
+                        return;
+                    }
+                    
+                    loadingMessage.textContent = '正在生成仪表板...';
+                    setTimeout(() => {
+                        generateDashboard();
+                        showDashboardSection();
+                    }, 800);
+                    
+                } catch (error) {
+                    console.error('数据处理错误:', error);
+                    showErrorSection('数据处理失败', '处理数据时发生错误，请重试');
+                }
+            };
+            
+            if (file.name.endsWith('.csv')) {
+                reader.readAsText(file);
+            } else {
+                reader.readAsArrayBuffer(file);
+            }
+        }
+        
+        // 处理映射后的员工数据
+        function processMappedEmployeeData(rawData) {
+            return rawData.map((item, rowIndex) => {
+                const normalizedItem = {};
+                let hasValidData = false;
+                
+                // 应用字段映射
+                Object.keys(fieldMapping).forEach(targetField => {
+                    const sourceField = fieldMapping[targetField];
+                    if (sourceField && item[sourceField] !== undefined && item[sourceField] !== null) {
+                        normalizedItem[targetField] = item[sourceField];
+                        hasValidData = true;
+                    } else {
+                        normalizedItem[targetField] = null;
                     }
                 });
                 
-                // 处理日期格式
+                // 特殊处理日期字段，支持多种格式
                 ['入职日期', '离职日期', '转正日期'].forEach(dateField => {
                     if (normalizedItem[dateField]) {
-                        // 尝试将Excel日期序列号转换为日期
-                        if (!isNaN(normalizedItem[dateField]) && normalizedItem[dateField] > 25569) {
-                            // Excel日期起点是1900年1月1日，JavaScript是1970年1月1日，相差25569天
-                            const date = new Date((normalizedItem[dateField] - 25569) * 86400000);
-                            normalizedItem[dateField] = date.toISOString().split('T')[0];
-                        } else if (typeof normalizedItem[dateField] === 'string') {
-                            // 尝试解析字符串日期
-                            const parsedDate = new Date(normalizedItem[dateField]);
-                            if (!isNaN(parsedDate.getTime())) {
-                                normalizedItem[dateField] = parsedDate.toISOString().split('T')[0];
-                            }
-                        }
+                        normalizedItem[dateField] = parseDate(normalizedItem[dateField]);
                     }
                 });
                 
-                return normalizedItem;
+                // 添加行号用于错误提示
+                normalizedItem._rowNumber = rowIndex + 2; // +2 是因为Excel行号从1开始，表头占1行
+                
+                return hasValidData ? normalizedItem : null;
+            }).filter(item => item !== null); // 过滤空行
+        }
+        
+        // 增强的日期解析函数，支持多种格式
+        function parseDate(dateValue) {
+            // 如果是数字，尝试作为Excel日期处理
+            if (!isNaN(dateValue) && dateValue > 25569) {
+                // Excel日期起点是1900年1月1日，JavaScript是1970年1月1日，相差25569天
+                const date = new Date((dateValue - 25569) * 86400000);
+                return date.toISOString().split('T')[0];
+            }
+            
+            // 如果是字符串，尝试多种格式解析
+            if (typeof dateValue === 'string') {
+                // 清理日期字符串
+                const cleaned = dateValue.trim()
+                    .replace(/[年月日]/g, '/')
+                    .replace(/[点分秒]/g, ':')
+                    .replace(/-/g, '/');
+                
+                // 尝试直接解析
+                const parsed = new Date(cleaned);
+                if (!isNaN(parsed.getTime())) {
+                    return parsed.toISOString().split('T')[0];
+                }
+                
+                // 尝试其他格式组合
+                const dateFormats = [
+                    /^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/, // yyyy/mm/dd 或 yyyy-mm-dd
+                    /^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/, // dd/mm/yyyy 或 dd-mm-yyyy
+                    /^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2})$/, // dd/mm/yy 或 dd-mm-yy
+                    /^(\d{2})[\/-](\d{1,2})[\/-](\d{1,2})$/, // yy/mm/dd 或 yy-mm-dd
+                ];
+                
+                for (const format of dateFormats) {
+                    const match = cleaned.match(format);
+                    if (match) {
+                        let year, month, day;
+                        
+                        if (format === dateFormats[0]) {
+                            [, year, month, day] = match;
+                        } else if (format === dateFormats[1]) {
+                            [, day, month, year] = match;
+                        } else if (format === dateFormats[2]) {
+                            [, day, month, year] = match;
+                            year = parseInt(year) < 50 ? `20${year}` : `19${year}`;
+                        } else if (format === dateFormats[3]) {
+                            [, year, month, day] = match;
+                            year = parseInt(year) < 50 ? `20${year}` : `19${year}`;
+                        }
+                        
+                        const date = new Date(`${year}-${month}-${day}`);
+                        if (!isNaN(date.getTime())) {
+                            return date.toISOString().split('T')[0];
+                        }
+                    }
+                }
+            }
+            
+            // 如果所有解析尝试都失败，返回原始值（后续验证会捕获）
+            return dateValue;
+        }
+        
+        // 验证处理后的数据
+        function validateProcessedData(data) {
+            const errors = [];
+            
+            data.forEach(item => {
+                // 验证日期格式
+                ['入职日期', '离职日期', '转正日期'].forEach(dateField => {
+                    if (item[dateField] && typeof item[dateField] === 'string' && !/^\d{4}-\d{2}-\d{2}$/.test(item[dateField])) {
+                        errors.push(`第 ${item._rowNumber} 行的 "${dateField}" 格式无法识别（值：${item[dateField]}）`);
+                    }
+                });
+                
+                // 验证必填字段
+                if (!item['姓名']) {
+                    errors.push(`第 ${item._rowNumber} 行缺少"姓名"信息`);
+                }
+                
+                if (!item['部门']) {
+                    errors.push(`第 ${item._rowNumber} 行缺少"部门"信息`);
+                }
+                
+                if (!item['岗位']) {
+                    errors.push(`第 ${item._rowNumber} 行缺少"岗位"信息`);
+                }
+                
+                if (!item['员工类型']) {
+                    errors.push(`第 ${item._rowNumber} 行缺少"员工类型"信息`);
+                }
             });
+            
+            return errors;
+        }
+        
+        // 显示带详细信息的错误
+        function showErrorWithDetails(title, message, details) {
+            errorTitle.textContent = title;
+            errorMessage.innerHTML = message;
+            
+            // 显示错误详情
+            errorDetailsList.innerHTML = '';
+            details.slice(0, 10).forEach(error => { // 只显示前10个错误
+                const li = document.createElement('li');
+                li.textContent = error;
+                errorDetailsList.appendChild(li);
+            });
+            
+            // 如果有更多错误，显示提示
+            if (details.length > 10) {
+                const li = document.createElement('li');
+                li.textContent = `... 还有 ${details.length - 10} 个错误`;
+                li.className = 'text-gray-500';
+                errorDetailsList.appendChild(li);
+            }
+            
+            errorDetails.classList.remove('hidden');
+            
+            // 显示错误区域
+            uploadSection.classList.add('hidden');
+            loadingSection.classList.add('hidden');
+            errorSection.classList.remove('hidden');
+            dashboardSection.classList.add('hidden');
+            mappingSection.classList.add('hidden');
         }
         
         // 生成仪表板
@@ -1994,6 +2326,7 @@
             loadingSection.classList.add('hidden');
             errorSection.classList.add('hidden');
             dashboardSection.classList.add('hidden');
+            mappingSection.classList.add('hidden');
             fileInput.value = ''; // 重置文件输入
             // 刷新页面按钮
             resetPageBtn.classList.add('hidden');
@@ -2008,6 +2341,7 @@
             loadingSection.classList.remove('hidden');
             errorSection.classList.add('hidden');
             dashboardSection.classList.add('hidden');
+            mappingSection.classList.add('hidden');
             // 刷新页面按钮
             resetPageBtn.classList.add('hidden');
         }
@@ -2016,10 +2350,14 @@
         function showErrorSection(title, message) {
             errorTitle.textContent = title;
             errorMessage.innerHTML = message;
+            errorDetails.classList.add('hidden'); // 隐藏详细信息
+            errorDetailsList.innerHTML = '';
+            
             uploadSection.classList.add('hidden');
             loadingSection.classList.add('hidden');
             errorSection.classList.remove('hidden');
             dashboardSection.classList.add('hidden');
+            mappingSection.classList.add('hidden');
             // 刷新页面按钮
             resetPageBtn.classList.add('hidden');
         }
@@ -2029,6 +2367,7 @@
             uploadSection.classList.add('hidden');
             loadingSection.classList.add('hidden');
             errorSection.classList.add('hidden');
+            mappingSection.classList.add('hidden');
             dashboardSection.classList.remove('hidden');
             
             // 显示刷新页面按钮
@@ -2087,6 +2426,6 @@
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', init);
     </script>
-
-
-    </body></html>
+</body>
+</html>
+    
